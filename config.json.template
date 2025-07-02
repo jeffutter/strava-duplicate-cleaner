@@ -1,0 +1,12 @@
+{
+    "client_id": "YOUR_CLIENT_ID",
+    "client_secret": "YOUR_CLIENT_SECRET",
+    "redirect_uri": "http://localhost:8000",
+    "scope": "read,activity:read_all",
+    "duplicate_threshold": {
+        "time_window_minutes": 10,
+        "distance_tolerance_percent": 5,
+        "duration_tolerance_percent": 5,
+        "minimum_overlap_percent": 80
+    }
+}
