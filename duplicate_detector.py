@@ -210,6 +210,10 @@ class DuplicateDetector:
         if activity.has_temperature:
             score += 3
 
+        # Prefer activities with map/GPS data (important for Stryd vs other sources)
+        if activity.has_map:
+            score += 8
+
         if activity.distance > 0:
             score += 5
 
@@ -218,6 +222,7 @@ class DuplicateDetector:
             'wahoo': 5,
             'polar': 5,
             'suunto': 5,
+            'stryd': 4,  # Add Stryd device support
             'iphone': 2,
             'android': 2,
             'strava': 1

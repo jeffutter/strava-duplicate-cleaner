@@ -1,16 +1,19 @@
-# Strava Duplicate Cleaner
+# Strava & Stryd Duplicate Cleaner
 
-A Python tool to find duplicate activities in your Strava account and provide URLs for manual deletion. Duplicates often occur when multiple devices (GPS watch, phone app, etc.) record the same workout.
+A Python tool to find duplicate activities in your Strava or Stryd account and provide URLs for manual deletion. Duplicates often occur when multiple devices (GPS watch, phone app, etc.) record the same workout or when activities are recorded by both Strava and Stryd.
 
 ## Features
 
+- **Dual API Support**: Works with both Strava and Stryd APIs
 - **Smart Duplicate Detection**: Uses time overlap, distance, and duration similarity to identify duplicates
 - **DST Time Shift Handling**: Automatically detects duplicates even with ±1 hour time differences
+- **GPS/Map Data Preference**: Prioritizes activities with GPS/map data when choosing between duplicates
 - **Data Quality Analysis**: Recommends which activity to keep based on data completeness (heart rate, power, cadence, etc.)
 - **Auto-deletion for Clear Winners**: Automatically marks obvious duplicates; only prompts when activities are very similar
 - **Batch URL Output**: Provides a consolidated list of deletion URLs at the end
 - **Flexible Date Ranges**: Search all activities or specify custom date ranges
 - **OAuth Authentication**: Secure authentication with Strava API (read-only)
+- **Email/Password Authentication**: Direct authentication with Stryd
 
 ## Setup
 
@@ -19,34 +22,49 @@ A Python tool to find duplicate activities in your Strava account and provide UR
    pip install -r requirements.txt
    ```
 
-2. **Create Strava API Application**
+2. **API Configuration**
+
+   ### For Strava:
    - Go to https://www.strava.com/settings/api
    - Create a new application
    - Set Authorization Callback Domain to `localhost`
+
+   ### For Stryd:
+   - No API application needed
+   - You'll use your Stryd account email and password
 
 3. **Configure the Tool**
    ```bash
    cp config.json.template config.json
    ```
-   Edit `config.json` and add your Client ID and Client Secret from Strava.
+   Edit `config.json` and add:
+   - For Strava: Your Client ID and Client Secret
+   - For Stryd: Your email and password in the "stryd" section
 
 4. **Initial Authentication**
    ```bash
+   # For Strava
    python main.py --setup
+   
+   # For Stryd
+   python main.py --api stryd --setup
    ```
 
 ## Usage
 
 ### Basic Usage
 ```bash
-# Check last 30 days for duplicates
+# Check last 30 days for duplicates (Strava - default)
 python main.py --last-days 30
+
+# Check last 30 days for duplicates (Stryd)
+python main.py --api stryd --last-days 30
 
 # Check specific date range
 python main.py --start-date 2024-01-01 --end-date 2024-12-31
 
-# Show all URLs without prompts
-python main.py --dry-run --last-days 7
+# Show all URLs without prompts (Stryd)
+python main.py --api stryd --dry-run --last-days 7
 ```
 
 ### Advanced Options
@@ -54,8 +72,11 @@ python main.py --dry-run --last-days 7
 # Custom overlap threshold (default: 80%)
 python main.py --overlap-threshold 90 --last-days 30
 
-# Enable debug logging to see detection details
-python main.py --debug --last-days 30
+# Enable debug logging to see detection details (Stryd)
+python main.py --api stryd --debug --last-days 30
+
+# Mix and match API with other options
+python main.py --api stryd --overlap-threshold 70 --start-date 2024-01-01
 ```
 
 ## How It Works
@@ -71,10 +92,11 @@ python main.py --debug --last-days 30
 Activities are scored based on:
 - Heart rate data: +10 points
 - Power data: +10 points  
+- GPS/Map data: +8 points (prioritizes activities with location tracking)
 - Cadence data: +5 points
+- Distance data: +5 points
 - Temperature data: +3 points
-- GPS accuracy: +5 points
-- Device trust level: +0-5 points
+- Device trust level: +0-5 points (Garmin/Wahoo/Polar/Suunto: +5, Stryd: +4, Phone: +2, Strava app: +1)
 - Social engagement: +2 points
 - Manual activities: -10 points
 
@@ -131,16 +153,42 @@ Activities marked for deletion: 3
 ## Configuration
 
 The `config.json` file contains:
-- Strava API credentials
+- Strava API credentials (client_id, client_secret)
+- Stryd credentials (email, password) 
 - Duplicate detection thresholds
 - OAuth settings
+
+Example config structure:
+```json
+{
+    "client_id": "YOUR_STRAVA_CLIENT_ID",
+    "client_secret": "YOUR_STRAVA_CLIENT_SECRET",
+    "stryd": {
+        "email": "your.email@example.com",
+        "password": "your_stryd_password"
+    },
+    "duplicate_threshold": {
+        "time_window_minutes": 10,
+        "distance_tolerance_percent": 5,
+        "duration_tolerance_percent": 5,
+        "minimum_overlap_percent": 80
+    }
+}
+```
 
 ## Troubleshooting
 
 ### Authentication Issues
+
+**Strava:**
 - Ensure your Strava app has the correct callback domain (`localhost`)
 - Check that your Client ID and Client Secret are correct
 - Try running `python main.py --setup` again
+
+**Stryd:**
+- Verify your email and password are correct in config.json
+- Make sure you can log into https://www.stryd.com with these credentials
+- Try running `python main.py --api stryd --setup` to test authentication
 
 ### Rate Limiting
 The tool automatically handles Strava's API rate limits with exponential backoff.
@@ -160,6 +208,9 @@ The tool automatically handles Strava's API rate limits with exponential backoff
 ## Limitations
 
 - Manual deletion required (deletion URLs provided)
-- Requires manual review of each duplicate pair
-- Limited to activities accessible via Strava API
-- Subject to Strava API rate limits (100 requests per 15 minutes, 1000 per day)
+- Requires manual review of each duplicate pair when activities are very similar
+- Limited to activities accessible via Strava or Stryd APIs
+- Subject to API rate limits:
+  - Strava: 100 requests per 15 minutes, 1000 per day
+  - Stryd: Rate limits handled automatically with exponential backoff
+- Stryd activities may require GPS/map data to be properly prioritized

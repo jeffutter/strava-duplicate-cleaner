@@ -9,6 +9,7 @@ from typing import List, Optional
 
 from auth import StravaAuth
 from strava_client import StravaClient
+from stryd_client import StrydClient
 from duplicate_detector import DuplicateDetector
 from ui import UserInterface
 
@@ -20,6 +21,67 @@ def setup_logging(debug=False):
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         datefmt='%H:%M:%S'
     )
+
+
+def initialize_strava_client(config: dict, setup_mode: bool, ui) -> Optional[StravaClient]:
+    """Initialize Strava client with OAuth authentication"""
+    auth = StravaAuth(
+        client_id=config['client_id'],
+        client_secret=config['client_secret'],
+        redirect_uri=config['redirect_uri']
+    )
+    
+    if setup_mode:
+        ui.display_authentication_needed()
+        tokens = auth.authenticate(config['scope'])
+        if tokens:
+            ui.display_success("Authentication successful! You can now run the duplicate cleaner.")
+        else:
+            ui.display_error("Authentication failed.")
+        return None
+    
+    access_token = auth.get_valid_access_token()
+    if not access_token:
+        ui.display_authentication_needed()
+        tokens = auth.authenticate(config['scope'])
+        if tokens:
+            access_token = tokens['access_token']
+        else:
+            ui.display_error("Authentication failed.")
+            return None
+    
+    return StravaClient(access_token)
+
+
+def initialize_stryd_client(config: dict, setup_mode: bool, ui) -> Optional[StrydClient]:
+    """Initialize Stryd client with email/password authentication"""
+    if 'stryd' not in config:
+        ui.display_error("Stryd configuration not found in config file. Please add stryd section with email and password.")
+        return None
+    
+    stryd_config = config['stryd']
+    email = stryd_config.get('email')
+    password = stryd_config.get('password')
+    
+    if not email or not password:
+        ui.display_error("Stryd email and password required in config file.")
+        return None
+    
+    client = StrydClient(email, password)
+    
+    if setup_mode:
+        ui.display_authentication_needed()
+        if client.authenticate():
+            ui.display_success("Stryd authentication successful! You can now run the duplicate cleaner.")
+        else:
+            ui.display_error("Stryd authentication failed.")
+        return None
+    
+    if not client.authenticate():
+        ui.display_error("Stryd authentication failed.")
+        return None
+    
+    return client
 
 
 def load_config(config_path: str = "config.json") -> dict:
@@ -41,12 +103,13 @@ def load_config(config_path: str = "config.json") -> dict:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Find and remove duplicate activities from Strava",
+        description="Find and remove duplicate activities from Strava or Stryd",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   %(prog)s --setup                          # First-time authentication setup
-  %(prog)s --last-days 30                   # Check last 30 days
+  %(prog)s --last-days 30                   # Check last 30 days (Strava)
+  %(prog)s --api stryd --last-days 30       # Check last 30 days (Stryd)
   %(prog)s --start-date 2024-01-01 --end-date 2024-12-31  # Date range
   %(prog)s --dry-run --last-days 7          # Show URLs only (no prompts)
   %(prog)s --overlap-threshold 90           # Custom overlap threshold
@@ -70,6 +133,8 @@ Examples:
                        help='Path to config file (default: config.json)')
     parser.add_argument('--debug', action='store_true',
                        help='Enable debug logging')
+    parser.add_argument('--api', type=str, choices=['strava', 'stryd'], default='strava',
+                       help='API to use: strava or stryd (default: strava)')
     
     args = parser.parse_args()
     
@@ -82,32 +147,18 @@ Examples:
     
     config['duplicate_threshold']['minimum_overlap_percent'] = args.overlap_threshold
     
-    auth = StravaAuth(
-        client_id=config['client_id'],
-        client_secret=config['client_secret'],
-        redirect_uri=config['redirect_uri']
-    )
-    
-    if args.setup:
-        ui.display_authentication_needed()
-        tokens = auth.authenticate(config['scope'])
-        if tokens:
-            ui.display_success("Authentication successful! You can now run the duplicate cleaner.")
-        else:
-            ui.display_error("Authentication failed.")
+    # Initialize client based on selected API
+    if args.api == 'strava':
+        client = initialize_strava_client(config, args.setup, ui)
+    elif args.api == 'stryd':
+        client = initialize_stryd_client(config, args.setup, ui)
+    else:
+        ui.display_error(f"Unsupported API: {args.api}")
         return
     
-    access_token = auth.get_valid_access_token()
-    if not access_token:
-        ui.display_authentication_needed()
-        tokens = auth.authenticate(config['scope'])
-        if tokens:
-            access_token = tokens['access_token']
-        else:
-            ui.display_error("Authentication failed.")
-            return
-    
-    client = StravaClient(access_token)
+    if not client:
+        ui.display_error("Failed to initialize API client")
+        return
     detector = DuplicateDetector(config['duplicate_threshold'])
     
     start_date = None

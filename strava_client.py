@@ -19,6 +19,7 @@ class Activity:
     has_power: bool
     has_cadence: bool
     has_temperature: bool
+    has_map: bool  # GPS/map data availability
     average_heartrate: Optional[float]
     average_power: Optional[float]
     average_cadence: Optional[float]
@@ -124,6 +125,9 @@ class StravaClient:
     def _parse_activity(self, data: Dict) -> Activity:
         start_date = parser.isoparse(data['start_date_local'])
         
+        # Determine if activity has map data - Strava activities typically have GPS unless manual
+        has_map = not data.get('manual', False) and data.get('start_latlng') is not None
+        
         return Activity(
             id=data['id'],
             name=data['name'],
@@ -136,6 +140,7 @@ class StravaClient:
             has_power=data.get('device_watts', False),
             has_cadence=data.get('has_cadence', False),
             has_temperature=False,
+            has_map=has_map,
             average_heartrate=data.get('average_heartrate'),
             average_power=data.get('average_watts'),
             average_cadence=data.get('average_cadence'),
@@ -149,6 +154,11 @@ class StravaClient:
     def _parse_detailed_activity(self, data: Dict) -> Activity:
         start_date = parser.isoparse(data['start_date_local'])
         
+        # Determine if activity has map data - check for GPS coordinates or polyline
+        has_map = (not data.get('manual', False) and 
+                   (data.get('start_latlng') is not None or 
+                    data.get('map', {}).get('polyline') is not None))
+        
         return Activity(
             id=data['id'],
             name=data['name'],
@@ -161,6 +171,7 @@ class StravaClient:
             has_power=data.get('device_watts', False),
             has_cadence=data.get('has_cadence', False),
             has_temperature=bool(data.get('average_temp')),
+            has_map=has_map,
             average_heartrate=data.get('average_heartrate'),
             average_power=data.get('average_watts'),
             average_cadence=data.get('average_cadence'),

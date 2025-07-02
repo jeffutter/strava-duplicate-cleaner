@@ -14,6 +14,8 @@ class DataQualityAnalyzer:
             score += 5
         if activity.has_temperature:
             score += 3
+        if activity.has_map:
+            score += 8
         
         if activity.distance > 0:
             score += 5

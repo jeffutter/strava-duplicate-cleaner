@@ -3,6 +3,10 @@
     "client_secret": "YOUR_CLIENT_SECRET",
     "redirect_uri": "http://localhost:8000",
     "scope": "read,activity:read_all",
+    "stryd": {
+        "email": "YOUR_STRYD_EMAIL",
+        "password": "YOUR_STRYD_PASSWORD"
+    },
     "duplicate_threshold": {
         "time_window_minutes": 10,
         "distance_tolerance_percent": 5,

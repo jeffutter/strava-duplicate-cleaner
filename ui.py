@@ -39,6 +39,10 @@ class UserInterface:
         cadence2_text = f"{activity2.average_cadence:.0f} spm ✓" if activity2.average_cadence else "-- ✗"
         print(f"Cadence: {cadence1_text:<25} | Cadence: {cadence2_text}")
         
+        gps1_text = "GPS ✓" if activity1.has_map else "GPS ✗"
+        gps2_text = "GPS ✓" if activity2.has_map else "GPS ✗"
+        print(f"Map/GPS: {gps1_text:<25} | Map/GPS: {gps2_text}")
+        
         print(f"Data Score: {summary1['score']}/100{'':<15} | Data Score: {summary2['score']}/100")
         print(f"Social: {activity1.kudos_count + activity1.comment_count} interactions{'':<12} | Social: {activity2.kudos_count + activity2.comment_count} interactions")
         
